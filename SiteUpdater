@@ -1,0 +1,50 @@
+#!/usr/bin/env php
+<?php
+$token = '';
+$owner = 'MichaelJ2324';
+
+if (count($argv)>2){
+	require __DIR__.'/vendor/autoload.php';
+
+	try{
+		$GHClient = new \MichaelJ2324\GitHub\Client();
+
+		$GHClient->setToken($token);
+
+		$repo = $argv[1];
+		$path = $argv[2];
+
+		$Releases = $GHClient->repo($owner, $repo)->releases();
+		$response = $Releases->latest()->execute()->getResponse();
+
+	    if ($response->getStatus() == '200') {
+	        $Latest = $response->getBody();
+        	$latestVersion = preg_replace('@[^0-9\.]+@i', '', $Latest['tag_name']);
+
+        	if (file_exists($path.'/version.php')){
+        		require $path.'/version.php';
+
+        		if (version_compare($version, $latestVersion, '<')){
+        			chdir($path);
+        			shell_exec('php artisan down --message="Upgrading Site"');
+        			shell_exec('git pull');
+        			shell_exec('composer update');
+        			shell_exec('php artisan up');
+        		}
+        	}
+	    }else{
+			if ($response->getError() === FALSE) {
+				print "Error retrieving latest release." . print_r($response->getBody(), true);
+			} else {
+				print "Curl error retrieving release. " . $response->getError();
+			}
+	    }
+	}catch(\Exception $ex){
+		print $ex->getMessage();
+	}
+}else{
+	print "Not enough arguments supplied.";
+}
+
+
+
